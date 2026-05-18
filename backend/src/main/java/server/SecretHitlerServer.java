@@ -73,6 +73,15 @@ public class SecretHitlerServer {
 
     public static final String COMMAND_END_TERM = "end-term";
 
+    // Speaking queue commands
+    public static final String COMMAND_REQUEST_SPEAK = "request-speak";
+    public static final String COMMAND_END_SPEAK = "end-speak";
+    public static final String COMMAND_CANCEL_SPEAK = "cancel-speak";
+
+    // Vote-to-kick commands
+    public static final String COMMAND_INITIATE_KICK = "initiate-kick";
+    public static final String COMMAND_VOTE_KICK = "vote-kick";
+
     private static final String CODE_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTWXYZ"; // u,v characters can look ambiguous
     private static final int CODE_LENGTH = 4;
 
@@ -693,6 +702,34 @@ public class SecretHitlerServer {
                     case COMMAND_SELECT_ICON:
                         String iconId = message.getString(PARAM_ICON);
                         lobby.trySetUserIcon(iconId, ctx);
+                        break;
+
+                    // Speaking queue commands (no OK message to avoid interfering with alert listeners)
+                    case COMMAND_REQUEST_SPEAK:
+                        lobby.game().requestToSpeak(name);
+                        sendOKMessage = false;
+                        break;
+
+                    case COMMAND_END_SPEAK:
+                        lobby.game().endSpeak(name);
+                        sendOKMessage = false;
+                        break;
+
+                    case COMMAND_CANCEL_SPEAK:
+                        lobby.game().cancelSpeak(name);
+                        sendOKMessage = false;
+                        break;
+
+                    // Vote-to-kick commands (no OK message to avoid interfering with alert listeners)
+                    case COMMAND_INITIATE_KICK:
+                        lobby.game().initiateKickVote(name, message.getString(PARAM_TARGET));
+                        sendOKMessage = false;
+                        break;
+
+                    case COMMAND_VOTE_KICK:
+                        boolean kickVote = message.getBoolean(PARAM_VOTE);
+                        lobby.game().registerKickVote(name, kickVote);
+                        sendOKMessage = false;
                         break;
 
                     default: // This is an invalid command.

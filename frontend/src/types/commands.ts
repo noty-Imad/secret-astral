@@ -19,6 +19,13 @@ export const enum WSCommandType {
   // Policy action
   REGISTER_CHANCELLOR_CHOICE = "register-chancellor-choice",
   REGISTER_PRESIDENT_CHOICE = "register-president-choice",
+  // Speaking queue
+  REQUEST_SPEAK = "request-speak",
+  END_SPEAK = "end-speak",
+  CANCEL_SPEAK = "cancel-speak",
+  // Vote to kick
+  INITIATE_KICK = "initiate-kick",
+  VOTE_KICK = "vote-kick",
 }
 
 /** All possible commands and associated parameters. */
@@ -37,7 +44,12 @@ export type ServerRequestPayload =
   | { command: WSCommandType.GET_INVESTIGATION; target: string }
   | { command: WSCommandType.REGISTER_VOTE; vote: boolean }
   | { command: WSCommandType.REGISTER_CHANCELLOR_CHOICE; choice: number }
-  | { command: WSCommandType.REGISTER_PRESIDENT_CHOICE; choice: number };
+  | { command: WSCommandType.REGISTER_PRESIDENT_CHOICE; choice: number }
+  | { command: WSCommandType.REQUEST_SPEAK }
+  | { command: WSCommandType.END_SPEAK }
+  | { command: WSCommandType.CANCEL_SPEAK }
+  | { command: WSCommandType.INITIATE_KICK; target: string }
+  | { command: WSCommandType.VOTE_KICK; vote: boolean };
 
 export type SendWSCommand = (payload: ServerRequestPayload) => void;
 

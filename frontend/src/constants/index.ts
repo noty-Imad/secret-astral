@@ -10,7 +10,7 @@ export enum PAGE {
 
 export const DEBUG = process.env.REACT_APP_DEBUG !== undefined;
 export const SERVER_ADDRESS =
-  process.env.REACT_APP_SERVER_ADDRESS || "secret-hitler-online.fly.dev";
+  process.env.REACT_APP_SERVER_ADDRESS || "secret-hitler-custom.fly.dev";
 export const SERVER_ADDRESS_HTTP =
   process.env.REACT_APP_SERVER_ADDRESS_HTTP || "https://" + SERVER_ADDRESS;
 export const WEBSOCKET_HEADER =
@@ -22,7 +22,7 @@ export const WEBSOCKET = "/game";
 export const SERVER_PING = "/ping";
 export const MAX_FAILED_CONNECTIONS = 5;
 export const LOBBY_CODE_LENGTH = 4;
-export const SERVER_TIMEOUT = 4000;
+export const SERVER_TIMEOUT = 6000;
 export const PING_INTERVAL = 50000;
 
 //////// Game Constants
@@ -65,6 +65,15 @@ export const COMMAND_REGISTER_SPECIAL_ELECTION = "register-special-election";
 export const COMMAND_GET_INVESTIGATION = "get-investigation";
 export const COMMAND_REGISTER_PEEK = "register-peek";
 export const COMMAND_END_TERM = "end-term";
+
+// Speaking queue commands
+export const COMMAND_REQUEST_SPEAK = "request-speak";
+export const COMMAND_END_SPEAK = "end-speak";
+export const COMMAND_CANCEL_SPEAK = "cancel-speak";
+
+// Vote-to-kick commands
+export const COMMAND_INITIATE_KICK = "initiate-kick";
+export const COMMAND_VOTE_KICK = "vote-kick";
 
 //</editor-fold>
 

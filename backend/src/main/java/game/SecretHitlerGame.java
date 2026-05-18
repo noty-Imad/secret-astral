@@ -11,6 +11,7 @@ import game.datastructures.board.SevenToEightPlayerBoard;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.LinkedList;
 
 /**
  * Keeps track of the state of a game of Secret Hitler.
@@ -91,6 +92,17 @@ public class SecretHitlerGame implements Serializable {
     private boolean didVetoOccurThisTurn = false;
 
     private HashMap<String, Boolean> voteMap;
+
+    // Speaking queue system
+    private LinkedList<String> speakingQueue;
+    private String currentSpeaker;
+    private HashMap<String, Integer> speakCountThisRound;
+    public static final int MAX_SPEAKS_PER_ROUND = 2;
+
+    // Vote-to-kick system
+    private String kickTarget;
+    private HashMap<String, Boolean> kickVoteMap;
+    private boolean kickVoteActive;
 
     // </editor-fold>
 
@@ -207,6 +219,16 @@ public class SecretHitlerGame implements Serializable {
         currentChancellor = null;
         lastChancellor = null;
         lastPresident = null;
+
+        // Initialize speaking queue
+        speakingQueue = new LinkedList<>();
+        currentSpeaker = null;
+        speakCountThisRound = new HashMap<>();
+
+        // Initialize vote-to-kick
+        kickTarget = null;
+        kickVoteMap = new HashMap<>();
+        kickVoteActive = false;
 
         state = GameState.CHANCELLOR_NOMINATION;
         round = 1;
@@ -615,6 +637,7 @@ public class SecretHitlerGame implements Serializable {
             currentPresident = getNextActivePlayer(currentPresident);
         }
         currentChancellor = null;
+        resetSpeakingQueue();
         this.lastState = this.state;
         this.state = GameState.CHANCELLOR_NOMINATION;
         this.round++;
@@ -1005,6 +1028,250 @@ public class SecretHitlerGame implements Serializable {
 
         electedPresident = username;
         concludePresidentialActions();
+    }
+
+    // </editor-fold>
+
+    /////////////////// Speaking Queue
+    // <editor-fold desc="Speaking Queue">
+
+    /**
+     * Requests to add a player to the speaking queue.
+     * Players can speak at most MAX_SPEAKS_PER_ROUND times per presidential round.
+     */
+    public void requestToSpeak(String username) {
+        if (!hasPlayer(username)) {
+            throw new IllegalArgumentException("Player " + username + " is not in the game.");
+        }
+        if (!getPlayer(username).isAlive()) {
+            throw new IllegalArgumentException("Dead players cannot request to speak.");
+        }
+        if (speakingQueue.contains(username) || username.equals(currentSpeaker)) {
+            throw new IllegalStateException("Player " + username + " is already in the speaking queue or speaking.");
+        }
+        int speakCount = speakCountThisRound.getOrDefault(username, 0);
+        if (speakCount >= MAX_SPEAKS_PER_ROUND) {
+            throw new IllegalStateException("Player " + username + " has already spoken " + MAX_SPEAKS_PER_ROUND + " times this round.");
+        }
+        speakingQueue.add(username);
+        // If nobody is currently speaking, make this player the speaker
+        if (currentSpeaker == null) {
+            advanceSpeaker();
+        }
+    }
+
+    /**
+     * Ends the current speaker's turn and advances to the next in queue.
+     */
+    public void endSpeak(String username) {
+        if (currentSpeaker == null || !currentSpeaker.equals(username)) {
+            throw new IllegalStateException("Player " + username + " is not the current speaker.");
+        }
+        advanceSpeaker();
+    }
+
+    /**
+     * Removes a player from the speaking queue (cancel their request).
+     */
+    public void cancelSpeak(String username) {
+        if (!speakingQueue.remove(username)) {
+            throw new IllegalStateException("Player " + username + " is not in the speaking queue.");
+        }
+    }
+
+    /**
+     * Advances to the next speaker in the queue, or sets currentSpeaker to null if empty.
+     */
+    private void advanceSpeaker() {
+        if (speakingQueue.isEmpty()) {
+            currentSpeaker = null;
+        } else {
+            currentSpeaker = speakingQueue.removeFirst();
+            int count = speakCountThisRound.getOrDefault(currentSpeaker, 0);
+            speakCountThisRound.put(currentSpeaker, count + 1);
+        }
+    }
+
+    /**
+     * Resets the speaking queue for a new round.
+     * Called when the presidential term ends.
+     */
+    private void resetSpeakingQueue() {
+        speakingQueue.clear();
+        currentSpeaker = null;
+        speakCountThisRound.clear();
+    }
+
+    public String getCurrentSpeaker() {
+        return currentSpeaker;
+    }
+
+    public List<String> getSpeakingQueue() {
+        return new ArrayList<>(speakingQueue);
+    }
+
+    public int getSpeakCount(String username) {
+        return speakCountThisRound.getOrDefault(username, 0);
+    }
+
+    public Map<String, Integer> getAllSpeakCounts() {
+        return new HashMap<>(speakCountThisRound);
+    }
+
+    // </editor-fold>
+
+    /////////////////// Vote to Kick
+    // <editor-fold desc="Vote to Kick">
+
+    /**
+     * Initiates a vote to kick an inactive player.
+     * Cannot kick during an active kick vote or when game has finished.
+     */
+    public void initiateKickVote(String initiator, String target) {
+        if (hasGameFinished()) {
+            throw new IllegalStateException("Cannot initiate a kick vote after the game has finished.");
+        }
+        if (kickVoteActive) {
+            throw new IllegalStateException("A kick vote is already in progress.");
+        }
+        // Block kick votes during active gameplay phases
+        if (state == GameState.CHANCELLOR_VOTING || state == GameState.LEGISLATIVE_PRESIDENT
+                || state == GameState.LEGISLATIVE_CHANCELLOR || state == GameState.LEGISLATIVE_PRESIDENT_VETO
+                || state == GameState.PRESIDENTIAL_POWER_PEEK || state == GameState.PRESIDENTIAL_POWER_INVESTIGATE
+                || state == GameState.PRESIDENTIAL_POWER_EXECUTION || state == GameState.PRESIDENTIAL_POWER_ELECTION) {
+            throw new IllegalStateException("Cannot initiate a kick vote during an active game phase.");
+        }
+        if (!hasPlayer(target)) {
+            throw new IllegalArgumentException("Player " + target + " does not exist.");
+        }
+        if (!getPlayer(target).isAlive()) {
+            throw new IllegalArgumentException("Cannot kick a dead player.");
+        }
+        if (!hasPlayer(initiator) || !getPlayer(initiator).isAlive()) {
+            throw new IllegalArgumentException("Initiator must be a living player.");
+        }
+        if (initiator.equals(target)) {
+            throw new IllegalArgumentException("Cannot vote to kick yourself.");
+        }
+        if (getLivingPlayerCount() <= 3) {
+            throw new IllegalStateException("Cannot kick when there are 3 or fewer living players.");
+        }
+
+        kickTarget = target;
+        kickVoteMap = new HashMap<>();
+        kickVoteActive = true;
+        // The initiator automatically votes yes
+        kickVoteMap.put(initiator, true);
+    }
+
+    /**
+     * Registers a vote in the active kick vote.
+     * When all living players have voted, the kick is resolved.
+     * Returns true if the vote concluded (either kick happened or vote failed).
+     */
+    public boolean registerKickVote(String voter, boolean vote) {
+        if (!kickVoteActive) {
+            throw new IllegalStateException("No kick vote is in progress.");
+        }
+        if (!hasPlayer(voter) || !getPlayer(voter).isAlive()) {
+            throw new IllegalArgumentException("Player " + voter + " cannot vote.");
+        }
+        if (voter.equals(kickTarget)) {
+            throw new IllegalArgumentException("The kick target cannot vote on their own kick.");
+        }
+        if (kickVoteMap.containsKey(voter)) {
+            throw new IllegalStateException("Player " + voter + " has already voted.");
+        }
+
+        kickVoteMap.put(voter, vote);
+
+        // Check if all eligible voters have voted (all living players except the target)
+        boolean allVoted = true;
+        for (Player p : playerList) {
+            if (p.isAlive() && !p.getUsername().equals(kickTarget) && !kickVoteMap.containsKey(p.getUsername())) {
+                allVoted = false;
+                break;
+            }
+        }
+
+        if (allVoted) {
+            resolveKickVote();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Resolves the kick vote. If majority voted yes, the target is killed/removed.
+     */
+    private void resolveKickVote() {
+        int yesVotes = 0;
+        int totalVotes = 0;
+        for (boolean v : kickVoteMap.values()) {
+            totalVotes++;
+            if (v) yesVotes++;
+        }
+
+        if ((float) yesVotes / (float) totalVotes > 0.5f) {
+            // Kick succeeded — kill the player
+            Player kicked = getPlayer(kickTarget);
+            kicked.kill();
+
+            // If the kicked player was Hitler, liberals win
+            if (kicked.isHitler()) {
+                this.lastState = this.state;
+                state = GameState.LIBERAL_VICTORY_EXECUTION;
+            }
+
+            // If the kicked player was president or chancellor, handle succession
+            if (kickTarget.equals(currentPresident)) {
+                currentPresident = getNextActivePlayer(kickTarget);
+            }
+            if (kickTarget.equals(currentChancellor)) {
+                currentChancellor = null;
+                // If we were in a legislative session, reset to nomination
+                if (state == GameState.LEGISLATIVE_PRESIDENT || state == GameState.LEGISLATIVE_CHANCELLOR
+                        || state == GameState.LEGISLATIVE_PRESIDENT_VETO) {
+                    this.lastState = this.state;
+                    state = GameState.CHANCELLOR_NOMINATION;
+                }
+            }
+
+            // Remove from speaking queue if present
+            speakingQueue.remove(kickTarget);
+            if (kickTarget.equals(currentSpeaker)) {
+                advanceSpeaker();
+            }
+        }
+
+        // Vote is done regardless of outcome
+        kickVoteActive = false;
+    }
+
+    /**
+     * Cancels the active kick vote (e.g., if the game state changes).
+     */
+    public void cancelKickVote() {
+        kickVoteActive = false;
+        kickTarget = null;
+        kickVoteMap = new HashMap<>();
+    }
+
+    public boolean isKickVoteActive() {
+        return kickVoteActive;
+    }
+
+    public String getKickTarget() {
+        return kickTarget;
+    }
+
+    public Map<String, Boolean> getKickVotes() {
+        return new HashMap<>(kickVoteMap);
+    }
+
+    public boolean wasPlayerKicked() {
+        // Returns true if the kick target is dead after the vote resolved
+        return !kickVoteActive && kickTarget != null && hasPlayer(kickTarget) && !getPlayer(kickTarget).isAlive();
     }
 
     // </editor-fold>

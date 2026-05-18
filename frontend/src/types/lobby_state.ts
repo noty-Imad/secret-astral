@@ -55,4 +55,15 @@ export type GameState = {
   usernames?: string[];
   /** Maps from usernames to icon keys */
   icon: Record<string, string>;
+
+  // Speaking queue
+  currentSpeaker?: string;
+  speakingQueue?: string[];
+  speakCounts?: Record<string, number>;
+  maxSpeaksPerRound?: number;
+
+  // Vote to kick
+  kickVoteActive?: boolean;
+  kickTarget?: string;
+  kickVotes?: Record<string, boolean>;
 };

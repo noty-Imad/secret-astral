@@ -125,6 +125,17 @@ public class GameToJSONConverter {
             out.put("peek", convertPolicyListToStringArray(game.getPeek()));
         }
 
+        // Speaking queue state
+        out.put("currentSpeaker", game.getCurrentSpeaker());
+        out.put("speakingQueue", game.getSpeakingQueue().toArray());
+        out.put("speakCounts", game.getAllSpeakCounts());
+        out.put("maxSpeaksPerRound", SecretHitlerGame.MAX_SPEAKS_PER_ROUND);
+
+        // Vote-to-kick state
+        out.put("kickVoteActive", game.isKickVoteActive());
+        out.put("kickTarget", game.getKickTarget());
+        out.put("kickVotes", game.getKickVotes());
+
         return out;
     }
 

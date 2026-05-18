@@ -22,6 +22,8 @@
     position: relative;
     perspective: 1000px;
     display: flex;
+    /* Create stacking context so card z-indices don't escape the alert box */
+    isolation: isolate;
 }
 
 #party-card-back, #party-card-front {

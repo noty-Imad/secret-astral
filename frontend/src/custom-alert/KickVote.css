@@ -1,0 +1,166 @@
+@import "../variables.css";
+
+/* Active kick vote overlay */
+.kick-vote-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(20, 20, 20, 0.7);
+}
+
+.kick-vote-box {
+  background-color: var(--alertFill);
+  padding: 24px 32px;
+  border-radius: 8px;
+  text-align: center;
+  min-width: 300px;
+  max-width: 90vw;
+  border: 2px solid var(--headerFill);
+}
+
+.kick-vote-title {
+  font-family: var(--headerFont);
+  font-size: 1.4em;
+  color: var(--headerFill);
+  margin: 0 0 12px 0;
+  letter-spacing: 2px;
+}
+
+.kick-vote-target {
+  font-family: var(--textFont);
+  font-size: 1em;
+  color: var(--textColorOnDark);
+  margin: 0 0 8px 0;
+}
+
+.kick-vote-target strong {
+  color: var(--textColorWhite);
+}
+
+.kick-vote-tally {
+  font-family: var(--textFont);
+  font-size: 0.85em;
+  color: var(--textColorOnDark);
+  margin: 0 0 16px 0;
+}
+
+.kick-vote-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.kick-vote-btn {
+  font-family: var(--textFont);
+  font-weight: bold;
+  font-size: 1em;
+  padding: 10px 32px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.kick-vote-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kick-vote-btn-yes {
+  background-color: var(--headerFill);
+  color: var(--textColorWhite);
+  box-shadow: 0 3px 0 var(--buttonShadowFill);
+}
+
+.kick-vote-btn-yes:hover:not(:disabled) {
+  background-color: var(--buttonHoverFill);
+}
+
+.kick-vote-btn-no {
+  background-color: var(--buttonAltFill);
+  color: var(--textColorWhite);
+  box-shadow: 0 3px 0 var(--buttonAltShadowFill);
+}
+
+.kick-vote-btn-no:hover:not(:disabled) {
+  background-color: var(--buttonAltHoverFill);
+}
+
+.kick-vote-status {
+  font-family: var(--textFont);
+  font-size: 0.9em;
+  color: var(--textColorOnDark);
+  font-style: italic;
+}
+
+/* Initiate kick UI (bottom of game page) */
+.kick-initiate-container {
+  text-align: center;
+  margin: 10px auto;
+}
+
+.kick-initiate-toggle {
+  font-family: var(--textFont);
+  font-size: 0.8em;
+  font-weight: bold;
+  padding: 6px 18px;
+  border: 1px solid var(--backgroundLight);
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--textColorOnDark);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kick-initiate-toggle:hover {
+  border-color: var(--headerFill);
+  color: var(--headerFill);
+}
+
+.kick-initiate-list {
+  margin-top: 8px;
+  padding: 12px;
+  background-color: var(--backgroundDark);
+  border: 1px solid var(--backgroundLight);
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.kick-initiate-hint {
+  font-family: var(--textFont);
+  font-size: 0.8em;
+  color: var(--textColorOnDark);
+  margin: 0 0 8px 0;
+}
+
+.kick-initiate-player-btn {
+  display: block;
+  width: 100%;
+  font-family: var(--textFont);
+  font-size: 0.85em;
+  padding: 6px 20px;
+  margin: 4px 0;
+  border: 1px solid var(--backgroundLight);
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--textColorOnDark);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kick-initiate-player-btn:hover:not(:disabled) {
+  background-color: var(--headerFill);
+  color: var(--textColorWhite);
+  border-color: var(--headerFill);
+}
+
+.kick-initiate-player-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

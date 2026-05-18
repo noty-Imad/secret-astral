@@ -85,6 +85,8 @@ import Player from "./player/Player";
 import LoginPageContent from "./LoginPageContent";
 import Cookies from "js-cookie";
 import AnnouncementBox from "./util/AnnouncementBox";
+import SpeakingQueue from "./custom-alert/SpeakingQueue";
+import KickVote from "./custom-alert/KickVote";
 import {
   GameState,
   LobbyState,
@@ -204,6 +206,7 @@ class App extends Component<{}, AppState> {
   okMessageListeners: (() => void)[] = [];
   allAnimationsFinished: boolean = true;
   gameOver: boolean = false;
+  lastGameState: GameState = DEFAULT_GAME_STATE;
 
   // noinspection DuplicatedCode
   constructor(props: any) {
@@ -437,16 +440,14 @@ class App extends Component<{}, AppState> {
         break;
 
       case PACKET_GAME_STATE:
-        if (message !== this.state.gameState) {
-          this.onGameStateChanged(message);
-        }
+        this.onGameStateChanged(message);
+        this.lastGameState = message;
         this.setState({ gameState: message, page: PAGE.GAME });
         break;
 
       case PACKET_OK: // Traverse all listeners and call the functions.
-        let i = 0;
-        for (i; i < this.okMessageListeners.length && i < 1; i++) {
-          this.okMessageListeners[i]();
+        for (const listener of this.okMessageListeners) {
+          listener();
         }
         this.okMessageListeners = []; // clear all listeners.
         break;
@@ -679,13 +680,13 @@ class App extends Component<{}, AppState> {
   renderLoginPage() {
     return (
       <div className="App">
-        <header className="App-header">SECRET-HITLER.ONLINE</header>
+        <header className="App-header">SECRET-ASTRAL</header>
         <br />
         <div style={{ textAlign: "center" }}>
           {/** TODO: Add reusable announcement component. 
                     <div style={{backgroundColor: "#222222", width: "50vmin", margin: "0 auto", padding: "20px"}}>
                         <p>
-                            Hello! Secret Hitler Online is currently undergoing some maintenance.
+                            Hello! Secret Astral is currently undergoing some maintenance.
                             Sorry for the interruption and please check back in in a few hours! -Shrimp
                         </p>
                         <p style={{fontStyle: "italic", fontSize: "calc(8px + 1vmin)"}}>(DATE TIME PM PT)</p>
@@ -839,6 +840,8 @@ class App extends Component<{}, AppState> {
   }
 
   onClickLeaveLobby() {
+    this.clearAnimationQueue();
+    this.okMessageListeners = [];
     this.websocket?.close();
     this.reconnectOnConnectionClosed = false;
   }
@@ -877,7 +880,7 @@ class App extends Component<{}, AppState> {
       this.state.usernames[0] === this.state.name;
     return (
       <div className="App">
-        <header className="App-header">SECRET-HITLER.ONLINE</header>
+        <header className="App-header">SECRET-ASTRAL</header>
 
         <CustomAlert show={this.state.showAlert}>
           {this.state.alertContent}
@@ -909,7 +912,7 @@ class App extends Component<{}, AppState> {
             <textarea
               id="linkText"
               readOnly={true}
-              value={"https://secret-hitler.online/?lobby=" + this.state.lobby}
+              value={"https://frontend-tan-five-63.vercel.app/?lobby=" + this.state.lobby}
             />
             <button onClick={this.onClickCopy}>COPY</button>
           </div>
@@ -1023,7 +1026,7 @@ class App extends Component<{}, AppState> {
    * @param newState {Object} the new game state sent from the server.
    */
   onGameStateChanged(newState: GameState) {
-    let oldState = this.state.gameState;
+    let oldState = this.lastGameState;
     let name = this.state.name;
     let isPresident = this.state.name === newState.president;
     let isChancellor = this.state.name === newState.chancellor;
@@ -1056,7 +1059,7 @@ class App extends Component<{}, AppState> {
     ];
     if (statesToShowPolicyFor.includes(state)) {
       // Check if the election tracker changed positions.
-      if (newState.electionTracker !== this.state.gameState.electionTracker) {
+      if (newState.electionTracker !== oldState.electionTracker) {
         let newPos = newState.electionTracker;
         let advancedToThree = newPos === 0 && newState.electionTrackerAdvanced;
         // We ignore all resets to 0, unless that reset was caused by the election tracker reaching 3.
@@ -1108,7 +1111,7 @@ class App extends Component<{}, AppState> {
     }
 
     // Check for state change
-    if (newState[PARAM_STATE] !== this.state.gameState[PARAM_STATE]) {
+    if (newState[PARAM_STATE] !== oldState[PARAM_STATE]) {
       // state has changed
       switch (newState[PARAM_STATE]) {
         case STATE_CHANCELLOR_NOMINATION:
@@ -1472,11 +1475,14 @@ class App extends Component<{}, AppState> {
                   }}
                   buttonText={"RETURN TO LOBBY"}
                   buttonOnClick={() => {
+                    this.clearAnimationQueue();
+                    this.okMessageListeners = [];
+                    this.lastGameState = DEFAULT_GAME_STATE;
                     this.gameOver = false;
                     this.reconnectOnConnectionClosed = true;
-                    this.tryOpenWebSocket(this.state.name, this.state.lobby);
-                    this.hideAlertAndFinish();
                     this.setState({
+                      showAlert: false,
+                      alertContent: <div />,
                       page: PAGE.LOBBY,
                       gameState: DEFAULT_GAME_STATE,
                       liberalPolicies: 0,
@@ -1485,6 +1491,7 @@ class App extends Component<{}, AppState> {
                       drawDeckSize: 17,
                       discardDeckSize: 0,
                     });
+                    this.tryOpenWebSocket(this.state.name, this.state.lobby);
                   }}
                 >
                   <PlayerDisplay
@@ -1701,7 +1708,7 @@ class App extends Component<{}, AppState> {
   renderGamePage() {
     return (
       <div className="App" style={{ textAlign: "center" }}>
-        <header className="App-header">SECRET-HITLER.ONLINE</header>
+        <header className="App-header">SECRET-ASTRAL</header>
 
         <CustomAlert show={this.state.showAlert}>
           {this.state.alertContent}
@@ -1721,6 +1728,12 @@ class App extends Component<{}, AppState> {
             playerDisabledFilter={DISABLE_EXECUTED_PLAYERS}
           />
         </div>
+
+        <SpeakingQueue
+          gameState={this.state.gameState}
+          sendWSCommand={this.sendWSCommand}
+          user={this.state.name}
+        />
 
         <StatusBar>{this.state.statusBarText}</StatusBar>
 
@@ -1780,6 +1793,12 @@ class App extends Component<{}, AppState> {
             />
           </div>
         </div>
+
+        <KickVote
+          gameState={this.state.gameState}
+          sendWSCommand={this.sendWSCommand}
+          user={this.state.name}
+        />
 
         <div style={{ textAlign: "center" }}>
           <div id="snackbar">{this.state.snackbarMessage}</div>
