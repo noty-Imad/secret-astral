@@ -23,6 +23,7 @@ import p_king from "./player-portraits/player-portrait-king.png";
 import p_akhaa from "./player-portraits/player-portrait-akhaa.png";
 import p_trump from "./player-portraits/player-portrait-trump.png";
 import p_curly from "./player-portraits/player-portrait-curly.png";
+import p_bibi from "./player-portraits/player-portrait-bibi.png";
 import twitter_icon from "./twitter-icon.svg";
 import badge_img from "./badge.svg";
 
@@ -52,6 +53,7 @@ const portraits: Record<string, string> = {
   p_akhaa,
   p_trump,
   p_curly,
+  p_bibi,
 };
 export default portraits;
 
@@ -62,6 +64,7 @@ export const unlockedPortraits: string[] = [
   "p_akhaa",
   "p_trump",
   "p_curly",
+  "p_bibi",
   "p1",
   "p2",
   "p3",
@@ -111,6 +114,7 @@ export const portraitsAltText: Record<string, string> = {
   p_akhaa: "Akhaa.",
   p_trump: "A stern figure in a suit.",
   p_curly: "A smiling woman with curly hair.",
+  p_bibi: "A stern man in a suit.",
 };
 
 export const badge = badge_img;
