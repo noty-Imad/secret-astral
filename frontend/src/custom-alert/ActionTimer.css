@@ -1,0 +1,59 @@
+@import "../variables.css";
+
+.action-timer {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.75);
+  border: 2px solid var(--headerFill);
+  border-radius: 8px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.action-timer-icon {
+  font-size: 1.2em;
+}
+
+.action-timer-text {
+  font-family: var(--headerFont);
+  font-size: 1.4em;
+  color: var(--textColorWhite);
+  letter-spacing: 2px;
+  min-width: 50px;
+  text-align: center;
+}
+
+.action-timer-urgent {
+  border-color: #ff4444;
+  animation: action-timer-pulse 1s infinite;
+}
+
+.action-timer-urgent .action-timer-text {
+  color: #ff4444;
+}
+
+@keyframes action-timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.action-timer-paused {
+  border-color: #888;
+  opacity: 0.7;
+  animation: none;
+}
+
+.action-timer-paused .action-timer-text {
+  color: #aaa;
+}
+
+.action-timer-paused-label {
+  font-family: var(--headerFont);
+  font-size: 0.7em;
+  color: #ffaa00;
+  letter-spacing: 1px;
+}

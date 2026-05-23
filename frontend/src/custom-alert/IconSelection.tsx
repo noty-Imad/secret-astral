@@ -36,15 +36,9 @@ class IconSelection extends Component<IconSelectionProps, IconSelectionState> {
   constructor(props: IconSelectionProps) {
     super(props);
 
-    // Check if the locked icons prompt should be shown. (using cookies!)
-    let hasUserUnlockedIcons = false;
-    if (Cookies.get(UNLOCK_ICONS_COOKIE_NAME)) {
-      hasUserUnlockedIcons = true;
-    }
-
     this.state = {
-      unlockLockedIcons: hasUserUnlockedIcons,
-      showLockedPrompt: !hasUserUnlockedIcons,
+      unlockLockedIcons: true,
+      showLockedPrompt: false,
     };
 
     this.onConfirmButtonClick = this.onConfirmButtonClick.bind(this);

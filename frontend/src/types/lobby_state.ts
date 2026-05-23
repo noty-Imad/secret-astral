@@ -61,6 +61,13 @@ export type GameState = {
   speakingQueue?: string[];
   speakCounts?: Record<string, number>;
   maxSpeaksPerRound?: number;
+  speakerSecondsLeft?: number;
+  speakTimeLimitSec?: number;
+  debateOpen?: boolean;
+  debateHappened?: boolean;
+
+  // Action timer (5 min auto-action)
+  actionTimerSecondsLeft?: number;
 
   // Vote to kick
   kickVoteActive?: boolean;

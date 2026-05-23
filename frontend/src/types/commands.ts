@@ -23,6 +23,8 @@ export const enum WSCommandType {
   REQUEST_SPEAK = "request-speak",
   END_SPEAK = "end-speak",
   CANCEL_SPEAK = "cancel-speak",
+  OPEN_DEBATE = "open-debate",
+  CLOSE_DEBATE = "close-debate",
   // Vote to kick
   INITIATE_KICK = "initiate-kick",
   VOTE_KICK = "vote-kick",
@@ -48,6 +50,8 @@ export type ServerRequestPayload =
   | { command: WSCommandType.REQUEST_SPEAK }
   | { command: WSCommandType.END_SPEAK }
   | { command: WSCommandType.CANCEL_SPEAK }
+  | { command: WSCommandType.OPEN_DEBATE }
+  | { command: WSCommandType.CLOSE_DEBATE }
   | { command: WSCommandType.INITIATE_KICK; target: string }
   | { command: WSCommandType.VOTE_KICK; vote: boolean };
 

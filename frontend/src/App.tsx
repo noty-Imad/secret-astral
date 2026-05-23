@@ -86,6 +86,7 @@ import LoginPageContent from "./LoginPageContent";
 import Cookies from "js-cookie";
 import AnnouncementBox from "./util/AnnouncementBox";
 import SpeakingQueue from "./custom-alert/SpeakingQueue";
+import ActionTimer from "./custom-alert/ActionTimer";
 import KickVote from "./custom-alert/KickVote";
 import {
   GameState,
@@ -207,6 +208,7 @@ class App extends Component<{}, AppState> {
   allAnimationsFinished: boolean = true;
   gameOver: boolean = false;
   lastGameState: GameState = DEFAULT_GAME_STATE;
+  pendingAnimationTimeouts: ReturnType<typeof setTimeout>[] = [];
 
   // noinspection DuplicatedCode
   constructor(props: any) {
@@ -428,6 +430,12 @@ class App extends Component<{}, AppState> {
     }
     switch (message[PARAM_PACKET_TYPE]) {
       case PACKET_LOBBY:
+        // Ignore lobby packets while the victory screen is showing —
+        // other players disconnecting causes the server to send PACKET_LOBBY
+        // (since game is null), which would kick us back to the lobby.
+        if (this.gameOver) {
+          break;
+        }
         this.setState({
           usernames: message[PARAM_USERNAMES],
           icons: message[PARAM_ICON],
@@ -440,7 +448,17 @@ class App extends Component<{}, AppState> {
         break;
 
       case PACKET_GAME_STATE:
-        this.onGameStateChanged(message);
+        // Set gameOver early so PACKET_LOBBY can't kick us out even if
+        // onGameStateChanged throws an error during victory processing.
+        if (message.state && message.state.includes("VICTORY")) {
+          this.gameOver = true;
+          this.reconnectOnConnectionClosed = false;
+        }
+        try {
+          this.onGameStateChanged(message);
+        } catch (e) {
+          console.error("Error processing game state:", e);
+        }
         this.lastGameState = message;
         this.setState({ gameState: message, page: PAGE.GAME });
         break;
@@ -460,14 +478,21 @@ class App extends Component<{}, AppState> {
         // Set party to liberal/fascist using sent packet
         const party = message[PARAM_INVESTIGATION];
 
-        this.queueAlert(
-          <InvestigationAlert
-            party={party}
-            target={message[PARAM_TARGET]}
-            hideAlert={this.hideAlertAndFinish}
-          />,
-          false
-        );
+        // Show directly via setState — bypassing animation queue to prevent
+        // the investigation card from being blocked by stale animations.
+        this.clearAnimationQueue();
+        this.setState({
+          alertContent: (
+            <InvestigationAlert
+              party={party}
+              target={message[PARAM_TARGET]}
+              hideAlert={() => {
+                this.setState({ showAlert: false });
+              }}
+            />
+          ),
+          showAlert: true,
+        });
         break;
       case PACKET_PONG:
       default:
@@ -776,7 +801,7 @@ class App extends Component<{}, AppState> {
       return (
         <Player
           key={i}
-          name={i === 0 ? name : name + " [Host]"}
+          name={name}
           showRole={false}
           icon={this.state.icons[name]}
           isBusy={this.state.icons[name] === defaultPortrait}
@@ -835,6 +860,21 @@ class App extends Component<{}, AppState> {
     ReactGA.event({
       category: "Starting Game",
       action: this.state.usernames.length + " players started game.",
+    });
+    // Reset all state from previous game
+    this.clearAnimationQueue();
+    this.okMessageListeners = [];
+    this.lastGameState = DEFAULT_GAME_STATE;
+    this.gameOver = false;
+    this.setState({
+      showAlert: false,
+      alertContent: <div />,
+      gameState: DEFAULT_GAME_STATE,
+      liberalPolicies: 0,
+      fascistPolicies: 0,
+      electionTracker: 0,
+      drawDeckSize: 17,
+      discardDeckSize: 0,
     });
     this.sendWSCommand({ command: WSCommandType.START_GAME });
   }
@@ -912,7 +952,7 @@ class App extends Component<{}, AppState> {
             <textarea
               id="linkText"
               readOnly={true}
-              value={"https://frontend-tan-five-63.vercel.app/?lobby=" + this.state.lobby}
+              value={"https://secret-astral.vercel.app/?lobby=" + this.state.lobby}
             />
             <button onClick={this.onClickCopy}>COPY</button>
           </div>
@@ -1057,7 +1097,29 @@ class App extends Component<{}, AppState> {
       LobbyState.FASCIST_VICTORY_POLICY,
       LobbyState.LIBERAL_VICTORY_POLICY,
     ];
-    if (statesToShowPolicyFor.includes(state)) {
+
+    // For presidential power states, skip the PolicyEnactedAlert animation
+    // and update the board immediately. The PolicyEnactedAlert would block
+    // the animation queue and prevent the presidential power prompt from
+    // showing (the alert executes immediately via addAnimationToQueue,
+    // and clearAnimationQueue later can't undo an already-showing alert).
+    const isPPState = [
+      LobbyState.PP_INVESTIGATE,
+      LobbyState.PP_EXECUTION,
+      LobbyState.PP_ELECTION,
+    ].includes(state);
+
+    if (isPPState) {
+      // For presidential power states: clear queue first, update board
+      // directly (no animations), so the PP prompt can show immediately.
+      this.clearAnimationQueue();
+      this.setState({
+        showAlert: false,
+        liberalPolicies: newState.liberalPolicies,
+        fascistPolicies: newState.fascistPolicies,
+        electionTracker: newState.electionTracker,
+      });
+    } else if (statesToShowPolicyFor.includes(state)) {
       // Check if the election tracker changed positions.
       if (newState.electionTracker !== oldState.electionTracker) {
         let newPos = newState.electionTracker;
@@ -1106,7 +1168,7 @@ class App extends Component<{}, AppState> {
           fascistPolicies: newState.fascistPolicies,
           electionTracker: newState.electionTracker,
         });
-        setTimeout(() => this.onAnimationFinish(), 500);
+        this.pendingAnimationTimeouts.push(setTimeout(() => this.onAnimationFinish(), 500));
       });
     }
 
@@ -1135,14 +1197,14 @@ class App extends Component<{}, AppState> {
           }
 
           this.queueEventUpdate("CHANCELLOR NOMINATION");
-          this.queueStatusMessage(
-            "Waiting for president to nominate a chancellor."
-          );
-
-          if (isPresident) {
-            //Show the chancellor nomination window.
+          if (isPresident && newState.debateHappened && !newState.debateOpen) {
+            this.queueStatusMessage("Debate complete. Nominate a chancellor.");
             this.queueAlert(
               SelectNominationPrompt(name, newState, this.sendWSCommand)
+            );
+          } else {
+            this.queueStatusMessage(
+              "President must open debate before nominating."
             );
           }
 
@@ -1255,42 +1317,46 @@ class App extends Component<{}, AppState> {
           break;
 
         case STATE_PP_ELECTION:
-          this.queueEventUpdate("PRESIDENTIAL POWER");
-          if (isPresident) {
-            this.queueAlert(
-              SelectSpecialElectionPrompt(name, newState, this.sendWSCommand)
-            );
-          } else {
-            this.queueStatusMessage(
-              "Special Election: President is choosing the next president."
-            );
-          }
-          break;
-
         case STATE_PP_EXECUTION:
-          this.queueEventUpdate("PRESIDENTIAL POWER");
-          if (isPresident) {
-            this.queueAlert(
-              SelectExecutionPrompt(name, newState, this.sendWSCommand),
-              true
-            );
-          } else {
-            this.queueStatusMessage(
-              "Execution: President is choosing a player to execute."
-            );
-          }
-          break;
-
         case STATE_PP_INVESTIGATE:
-          this.queueEventUpdate("PRESIDENTIAL POWER");
-          if (isPresident) {
-            this.queueAlert(
-              SelectInvestigationPrompt(name, newState, this.sendWSCommand)
-            );
+          // Presidential power states: bypass the animation queue entirely.
+          // The queue has stale timeouts (showVotes 6.5s, eventUpdate 2.5s)
+          // that fire onAnimationFinish() and corrupt anything we queue.
+          // Instead, set UI state directly via setState.
+          this.clearAnimationQueue();
+          this.setState({ showAlert: false, showVotes: false });
+          if (isPresident && newState.debateHappened && !newState.debateOpen) {
+            // Debate already completed — show the prompt directly.
+            let ppPrompt: JSX.Element;
+            let ppStatus: string;
+            if (newState[PARAM_STATE] === STATE_PP_ELECTION) {
+              ppStatus = "Choose the next president.";
+              ppPrompt = SelectSpecialElectionPrompt(name, newState, this.sendWSCommand);
+            } else if (newState[PARAM_STATE] === STATE_PP_EXECUTION) {
+              ppStatus = "Choose a player to execute.";
+              ppPrompt = SelectExecutionPrompt(name, newState, this.sendWSCommand);
+            } else {
+              ppStatus = "Choose a player to investigate.";
+              ppPrompt = SelectInvestigationPrompt(name, newState, this.sendWSCommand);
+            }
+            this.setState({
+              statusBarText: ppStatus,
+              alertContent: ppPrompt,
+              showAlert: true,
+            });
+            this.addServerOKListener(() => this.hideAlertAndFinish(false));
           } else {
-            this.queueStatusMessage(
-              "Investigation: President is choosing a player to investigate."
-            );
+            // Debate hasn't happened yet — show instruction, prompt comes
+            // via the debate-close handler below.
+            let waitMsg: string;
+            if (newState[PARAM_STATE] === STATE_PP_ELECTION) {
+              waitMsg = "President must open debate before choosing next president.";
+            } else if (newState[PARAM_STATE] === STATE_PP_EXECUTION) {
+              waitMsg = "President must open debate before executing.";
+            } else {
+              waitMsg = "President must open debate before investigating.";
+            }
+            this.setState({ statusBarText: waitMsg });
           }
           break;
 
@@ -1352,7 +1418,7 @@ class App extends Component<{}, AppState> {
                       players={[newState.targetUser!]}
                     />
                   </ButtonPrompt>,
-                  true
+                  false
                 );
               } else {
                 // Is President; do nothing because we handle the
@@ -1510,11 +1576,63 @@ class App extends Component<{}, AppState> {
           });
           this.gameOver = true;
           this.reconnectOnConnectionClosed = false;
-          this.websocket?.close();
+          // Don't close websocket here — closing it triggers other players
+          // to receive PACKET_LOBBY before they've seen the victory screen.
+          // The websocket will close when the user clicks "RETURN TO LOBBY".
           break;
 
         default:
         // Do nothing
+      }
+    }
+
+    // Show nomination prompt once debate has been closed
+    if (
+      newState[PARAM_STATE] === STATE_CHANCELLOR_NOMINATION &&
+      newState.debateHappened &&
+      !newState.debateOpen &&
+      (oldState.debateOpen || !oldState.debateHappened) &&
+      newState.president === name
+    ) {
+      this.queueStatusMessage("Debate complete. Nominate a chancellor.");
+      this.queueAlert(
+        SelectNominationPrompt(name, newState, this.sendWSCommand)
+      );
+    }
+
+    // Show presidential power prompts once debate has been closed.
+    // Use direct setState instead of animation queue — the queue may have
+    // stale timeouts that would interfere.
+    if (
+      newState.debateHappened &&
+      !newState.debateOpen &&
+      (oldState.debateOpen || !oldState.debateHappened) &&
+      newState.president === name
+    ) {
+      if (newState[PARAM_STATE] === STATE_PP_EXECUTION) {
+        this.clearAnimationQueue();
+        this.setState({
+          statusBarText: "Debate complete. Choose a player to execute.",
+          alertContent: SelectExecutionPrompt(name, newState, this.sendWSCommand),
+          showAlert: true,
+        });
+        this.addServerOKListener(() => this.hideAlertAndFinish(false));
+      } else if (newState[PARAM_STATE] === STATE_PP_INVESTIGATE) {
+        this.clearAnimationQueue();
+        this.setState({
+          statusBarText: "Debate complete. Choose a player to investigate.",
+          alertContent: SelectInvestigationPrompt(name, newState, this.sendWSCommand),
+          showAlert: true,
+        });
+        this.addServerOKListener(() => this.hideAlertAndFinish(false));
+      } else if (newState[PARAM_STATE] === STATE_PP_ELECTION) {
+        this.clearAnimationQueue();
+        this.setState({
+          statusBarText: "Debate complete. Choose the next president.",
+          alertContent: SelectSpecialElectionPrompt(name, newState, this.sendWSCommand),
+          showAlert: true,
+        });
+        this.addServerOKListener(() => this.hideAlertAndFinish(false));
       }
     }
 
@@ -1556,6 +1674,13 @@ class App extends Component<{}, AppState> {
     this.allAnimationsFinished = true;
     this.setState({ allAnimationsFinished: true });
     this.animationQueue = [];
+    this.okMessageListeners = [];
+    // Cancel any pending setTimeout callbacks from showVotes / queueEventUpdate
+    // so they don't fire stale onAnimationFinish() calls that corrupt the queue.
+    for (const t of this.pendingAnimationTimeouts) {
+      clearTimeout(t);
+    }
+    this.pendingAnimationTimeouts = [];
   }
 
   /**
@@ -1578,9 +1703,9 @@ class App extends Component<{}, AppState> {
 
   showVotes(newState: GameState) {
     this.setState({ statusBarText: "Tallying votes..." });
-    setTimeout(() => {
+    this.pendingAnimationTimeouts.push(setTimeout(() => {
       this.setState({ showVotes: true });
-    }, 1000);
+    }, 1000));
     // Calculate final result:
 
     let noVotes = 0;
@@ -1592,7 +1717,7 @@ class App extends Component<{}, AppState> {
         noVotes++;
       }
     });
-    setTimeout(() => {
+    this.pendingAnimationTimeouts.push(setTimeout(() => {
       if (yesVotes > noVotes) {
         this.setState({
           statusBarText: yesVotes + " - " + noVotes + ": Vote passed",
@@ -1602,14 +1727,14 @@ class App extends Component<{}, AppState> {
           statusBarText: yesVotes + " - " + noVotes + ": Vote failed",
         });
       }
-    }, 2000);
-    setTimeout(
+    }, 2000));
+    this.pendingAnimationTimeouts.push(setTimeout(
       () => this.setState({ showVotes: false, statusBarText: "" }),
       6000
-    );
-    setTimeout(() => {
+    ));
+    this.pendingAnimationTimeouts.push(setTimeout(() => {
       this.onAnimationFinish();
-    }, 6500);
+    }, 6500));
   }
 
   /**
@@ -1632,10 +1757,10 @@ class App extends Component<{}, AppState> {
   hideAlertAndFinish(delayExit = true) {
     this.setState({ showAlert: false });
     if (delayExit) {
-      setTimeout(() => {
+      this.pendingAnimationTimeouts.push(setTimeout(() => {
         this.setState({ alertContent: <div /> }); // reset the alert box contents
         this.onAnimationFinish();
-      }, CUSTOM_ALERT_FADE_DURATION);
+      }, CUSTOM_ALERT_FADE_DURATION));
     } else {
       this.setState({ alertContent: <div /> });
       this.onAnimationFinish();
@@ -1655,12 +1780,12 @@ class App extends Component<{}, AppState> {
         showEventBar: true,
         eventBarMessage: message,
       });
-      setTimeout(() => {
+      this.pendingAnimationTimeouts.push(setTimeout(() => {
         this.setState({ showEventBar: false });
-      }, duration);
-      setTimeout(() => {
+      }, duration));
+      this.pendingAnimationTimeouts.push(setTimeout(() => {
         this.onAnimationFinish();
-      }, duration + EVENT_BAR_FADE_OUT_DURATION);
+      }, duration + EVENT_BAR_FADE_OUT_DURATION));
     });
   }
 
@@ -1713,6 +1838,8 @@ class App extends Component<{}, AppState> {
         <CustomAlert show={this.state.showAlert}>
           {this.state.alertContent}
         </CustomAlert>
+
+        <ActionTimer gameState={this.state.gameState} />
 
         <EventBar
           show={this.state.showEventBar}
@@ -1824,6 +1951,18 @@ class App extends Component<{}, AppState> {
       });
     }
 
+    // If gameOver and we have a victory state, always render the victory screen
+    // directly — bypassing the animation queue entirely. This is the last-resort
+    // fallback to ensure the victory board is ALWAYS shown.
+    if (this.gameOver && (this.state.gameState?.state?.includes("VICTORY") || this.lastGameState?.state?.includes("VICTORY"))) {
+      return (
+        <>
+          <HelmetMetaData />
+          {this.renderVictoryScreen()}
+        </>
+      );
+    }
+
     let page_render;
     switch (this.state.page) {
       case PAGE.LOBBY:
@@ -1841,6 +1980,105 @@ class App extends Component<{}, AppState> {
         <HelmetMetaData />
         {page_render}
       </>
+    );
+  }
+
+  renderVictoryScreen() {
+    // Use lastGameState as fallback if state.gameState doesn't have victory info
+    const gs = this.state.gameState?.state?.includes("VICTORY")
+      ? this.state.gameState
+      : this.lastGameState;
+
+    if (!gs || !gs.playerOrder || gs.playerOrder.length === 0) {
+      return <div className="App"><header className="App-header">SECRET-ASTRAL</header><p>Loading victory results...</p></div>;
+    }
+
+    const fascistPlayers: string[] = [];
+    const liberalPlayers: string[] = [];
+    gs.playerOrder.forEach((player) => {
+      const role = gs.players[player]?.id;
+      if (role === Role.FASCIST || role === Role.HITLER) {
+        fascistPlayers.push(player);
+      } else {
+        liberalPlayers.push(player);
+      }
+    });
+
+    const isFascistVictory =
+      gs.state === STATE_FASCIST_VICTORY_POLICY ||
+      gs.state === STATE_FASCIST_VICTORY_ELECTION;
+    const players = isFascistVictory
+      ? fascistPlayers.concat(liberalPlayers)
+      : liberalPlayers.concat(fascistPlayers);
+
+    let victoryMessage = "";
+    switch (gs.state) {
+      case STATE_FASCIST_VICTORY_POLICY:
+        victoryMessage = "Fascists successfully passed six policies!";
+        break;
+      case STATE_FASCIST_VICTORY_ELECTION:
+        victoryMessage = "Fascists successfully elected Hitler as chancellor!";
+        break;
+      case STATE_LIBERAL_VICTORY_POLICY:
+        victoryMessage = "Liberals successfully passed five policies!";
+        break;
+      case STATE_LIBERAL_VICTORY_EXECUTION:
+        victoryMessage = "Liberals successfully executed Hitler!";
+        break;
+    }
+
+    const headerImage = isFascistVictory ? VictoryFascistHeader : VictoryLiberalHeader;
+    const headerAlt = isFascistVictory
+      ? "Fascist Victory, written in red with a skull icon."
+      : "Liberal Victory, written in blue with a dove icon.";
+    const messageClass = isFascistVictory ? "highlight" : "highlight-blue";
+
+    return (
+      <div className="App" style={{ textAlign: "center" }}>
+        <header className="App-header">SECRET-ASTRAL</header>
+        <CustomAlert show={true}>
+          <ButtonPrompt
+            renderLabel={() => (
+              <>
+                <img src={headerImage} alt={headerAlt} id={"victory-header"} />
+                <p style={{ textAlign: "center" }} className={messageClass}>
+                  {victoryMessage}
+                </p>
+              </>
+            )}
+            buttonText={"RETURN TO LOBBY"}
+            buttonOnClick={() => {
+              this.clearAnimationQueue();
+              this.okMessageListeners = [];
+              this.lastGameState = DEFAULT_GAME_STATE;
+              this.gameOver = false;
+              this.reconnectOnConnectionClosed = true;
+              this.setState({
+                showAlert: false,
+                alertContent: <div />,
+                page: PAGE.LOBBY,
+                gameState: DEFAULT_GAME_STATE,
+                liberalPolicies: 0,
+                fascistPolicies: 0,
+                electionTracker: 0,
+                drawDeckSize: 17,
+                discardDeckSize: 0,
+              });
+              this.tryOpenWebSocket(this.state.name, this.state.lobby);
+            }}
+          >
+            <PlayerDisplay
+              players={players}
+              playerDisabledFilter={DISABLE_NONE}
+              showRoles={true}
+              showLabels={false}
+              useAsButtons={false}
+              user={this.state.name}
+              gameState={gs}
+            />
+          </ButtonPrompt>
+        </CustomAlert>
+      </div>
     );
   }
 }

@@ -10,7 +10,7 @@ export enum PAGE {
 
 export const DEBUG = process.env.REACT_APP_DEBUG !== undefined;
 export const SERVER_ADDRESS =
-  process.env.REACT_APP_SERVER_ADDRESS || "secret-hitler-custom.fly.dev";
+  process.env.REACT_APP_SERVER_ADDRESS || "agtea-secret-astral-backend.hf.space";
 export const SERVER_ADDRESS_HTTP =
   process.env.REACT_APP_SERVER_ADDRESS_HTTP || "https://" + SERVER_ADDRESS;
 export const WEBSOCKET_HEADER =

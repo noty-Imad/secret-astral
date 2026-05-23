@@ -19,6 +19,10 @@ import p18 from "./player-portraits/player-portrait-18.svg";
 import p19 from "./player-portraits/player-portrait-19.svg";
 import p20 from "./player-portraits/player-portrait-20.svg";
 import p_default from "./player-portraits/player-portrait-default.svg";
+import p_king from "./player-portraits/player-portrait-king.png";
+import p_akhaa from "./player-portraits/player-portrait-akhaa.png";
+import p_trump from "./player-portraits/player-portrait-trump.jpg";
+import p_curly from "./player-portraits/player-portrait-curly.jpg";
 import twitter_icon from "./twitter-icon.svg";
 import badge_img from "./badge.svg";
 
@@ -44,12 +48,20 @@ const portraits: Record<string, string> = {
   p18,
   p19,
   p20,
+  p_king,
+  p_akhaa,
+  p_trump,
+  p_curly,
 };
 export default portraits;
 
 export const defaultPortrait = "p_default";
 
 export const unlockedPortraits: string[] = [
+  "p_king",
+  "p_akhaa",
+  "p_trump",
+  "p_curly",
   "p1",
   "p2",
   "p3",
@@ -60,8 +72,6 @@ export const unlockedPortraits: string[] = [
   "p8",
   "p9",
   "p10",
-];
-export const lockedPortraits: string[] = [
   "p11",
   "p12",
   "p13",
@@ -73,6 +83,7 @@ export const lockedPortraits: string[] = [
   "p19",
   "p20",
 ];
+export const lockedPortraits: string[] = [];
 
 export const portraitsAltText: Record<string, string> = {
   p_default: "No icon selected.",
@@ -96,6 +107,10 @@ export const portraitsAltText: Record<string, string> = {
   p18: "A stranger with long bangs hiding half of their face.",
   p19: "A cat.",
   p20: "An unsettling stranger shadowed in darkness.",
+  p_king: "A king.",
+  p_akhaa: "Akhaa.",
+  p_trump: "A stern figure in a suit.",
+  p_curly: "A smiling woman with curly hair.",
 };
 
 export const badge = badge_img;
