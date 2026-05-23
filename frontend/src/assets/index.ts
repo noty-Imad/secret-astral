@@ -21,8 +21,8 @@ import p20 from "./player-portraits/player-portrait-20.svg";
 import p_default from "./player-portraits/player-portrait-default.svg";
 import p_king from "./player-portraits/player-portrait-king.png";
 import p_akhaa from "./player-portraits/player-portrait-akhaa.png";
-import p_trump from "./player-portraits/player-portrait-trump.jpg";
-import p_curly from "./player-portraits/player-portrait-curly.jpg";
+import p_trump from "./player-portraits/player-portrait-trump.png";
+import p_curly from "./player-portraits/player-portrait-curly.png";
 import twitter_icon from "./twitter-icon.svg";
 import badge_img from "./badge.svg";
 
