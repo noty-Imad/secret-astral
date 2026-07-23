@@ -35,7 +35,7 @@
 	"devDependencies": {
 		"@babel/plugin-proposal-private-property-in-object": "^7.21.11",
 		"@types/js-cookie": "^3.0.6",
-		"@types/node": "^20.11.16",
+		"@types/node": "^25.9.0",
 		"@types/twitter-for-web": "^0.0.6",
 		"env-cmd": "^10.1.0",
 		"prop-types": "^15.7.2",
